@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast RSS Server</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎙️ Podcast RSS Server</h1>
+            <nav>
+                <a href="/">Dashboard</a>
+                <a href="/feed.xml" target="_blank">RSS Feed</a>
+                <a href="#settings" hx-get="/api/podcast/settings" hx-target="#main-content">Settings</a>
+            </nav>
+        </header>
+
+        <main id="main-content">
+            <section class="upload-section">
+                <h2>Upload New Episode</h2>
+                <div id="upload-form-container">
+                    {{template "upload_form.html"}}
+                </div>
+            </section>
+
+            <section class="episodes-section mt-20">
+                <h2>Episodes ({{len .Podcast.Episodes}})</h2>
+                <div id="episode-list">
+                    {{template "episode_list.html" .Podcast}}
+                </div>
+            </section>
+        </main>
+
+        <footer class="mt-20 text-muted">
+            <p>RSS Feed URL: <a href="{{.FeedURL}}" target="_blank"><code>{{.FeedURL}}</code></a></p>
+            <p>Podcast RSS Server - File-centric podcast hosting</p>
+        </footer>
+    </div>
+</body>
+</html>

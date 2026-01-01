@@ -1,0 +1,60 @@
+<form hx-post="/api/episodes" 
+      hx-encoding="multipart/form-data"
+      hx-target="#episode-list" 
+      hx-swap="afterbegin"
+      hx-indicator="#upload-spinner">
+    
+    <div class="form-group">
+        <label for="audio">Audio File (MP3)</label>
+        <input type="file" id="audio" name="audio" accept=".mp3" required>
+    </div>
+
+    <div class="form-group">
+        <label for="title">Episode Title</label>
+        <input type="text" id="title" name="title" placeholder="My Great Episode" required>
+    </div>
+
+    <div class="form-group">
+        <label for="description">Episode Description</label>
+        <textarea id="description" name="description" placeholder="This episode is about..." required></textarea>
+    </div>
+
+    <div class="form-group">
+        <label for="pubDate">Publication Date (optional)</label>
+        <input type="datetime-local" id="pubDate" name="pubDate">
+    </div>
+
+    <div class="form-group">
+        <label for="episodeNumber">Episode Number (optional)</label>
+        <input type="number" id="episodeNumber" name="episodeNumber" min="1">
+    </div>
+
+    <div class="form-group">
+        <label for="seasonNumber">Season Number (optional)</label>
+        <input type="number" id="seasonNumber" name="seasonNumber" min="1">
+    </div>
+
+    <div class="form-group">
+        <label for="explicit">Explicit Content</label>
+        <select id="explicit" name="explicit">
+            <option value="no">No</option>
+            <option value="yes">Yes</option>
+            <option value="clean">Clean</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label for="episodeType">Episode Type</label>
+        <select id="episodeType" name="episodeType">
+            <option value="full">Full</option>
+            <option value="trailer">Trailer</option>
+            <option value="bonus">Bonus</option>
+        </select>
+    </div>
+
+    <button type="submit">Upload Episode</button>
+    
+    <span id="upload-spinner" class="htmx-indicator">
+        Uploading...
+    </span>
+</form>

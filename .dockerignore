@@ -1,0 +1,60 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+specs/
+
+# Development
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+*_test.go
+testdata/
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Data (will be mounted as volumes)
+data/audio/*
+data/artwork/*
+data/podcast.xml
+
+# Keep directory structure
+!data/audio/.gitkeep
+!data/artwork/.gitkeep
+
+# Temporary files
+*.log
+*.tmp
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Specify memory
+.specify/
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
