@@ -1,5 +1,9 @@
 # Podcast RSS Server Configuration
 
+# Base URL for the server (required for RSS feed absolute URLs)
+# Example: http://example.com:8080 or https://mypodcast.com
+base_url: "http://localhost:8080"
+
 server:
   port: 8080
   host: "0.0.0.0"
