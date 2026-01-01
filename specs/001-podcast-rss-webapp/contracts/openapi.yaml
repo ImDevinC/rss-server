@@ -1,0 +1,536 @@
+openapi: 3.0.3
+info:
+  title: Podcast RSS Webapp API
+  description: |
+    REST API for managing podcast episodes and RSS feed generation.
+    
+    This API provides endpoints for:
+    - Uploading podcast episodes (audio files + metadata)
+    - Deleting podcast episodes
+    - Updating podcast-level metadata (title, author, artwork)
+    - Serving the RSS feed
+    - Serving audio files
+    
+    **Architecture**: Single podcast per instance, no authentication (private URL model).
+    **Storage**: RSS XML file as source of truth (file-centric architecture).
+  version: 1.0.0
+  contact:
+    name: RSS Server Project
+    url: https://github.com/example/rss-server
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+tags:
+  - name: episodes
+    description: Episode management operations (add, delete, list)
+  - name: podcast
+    description: Podcast-level metadata management
+  - name: feed
+    description: RSS feed serving
+  - name: media
+    description: Audio file serving
+
+paths:
+  /api/episodes:
+    post:
+      tags:
+        - episodes
+      summary: Upload a new podcast episode
+      description: |
+        Uploads an audio file and creates a new episode in the RSS feed.
+        The episode is immediately available in the feed after successful upload.
+        
+        **Process**:
+        1. Validate audio file (MP3, size < 500MB)
+        2. Save audio file to filesystem
+        3. Generate episode ID from title and date
+        4. Add episode to RSS XML
+        5. Return episode details
+      operationId: uploadEpisode
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - audio
+                - title
+                - description
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: Audio file (MP3 format, max 500MB)
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Episode title
+                  example: "Getting Started with Go"
+                description:
+                  type: string
+                  minLength: 1
+                  maxLength: 4000
+                  description: Episode description (supports HTML)
+                  example: "An introduction to the Go programming language and its ecosystem"
+                pubDate:
+                  type: string
+                  format: date-time
+                  description: Publication date (defaults to now if not provided)
+                  example: "2025-12-31T10:00:00Z"
+                episodeNumber:
+                  type: integer
+                  minimum: 1
+                  description: Episode number (optional)
+                  example: 1
+                seasonNumber:
+                  type: integer
+                  minimum: 1
+                  description: Season number (optional)
+                  example: 1
+                explicit:
+                  type: string
+                  enum: [yes, no, clean]
+                  description: Explicit content flag (defaults to "no")
+                  example: "no"
+                episodeType:
+                  type: string
+                  enum: [full, trailer, bonus]
+                  description: Episode type (defaults to "full")
+                  example: "full"
+      responses:
+        '201':
+          description: Episode created successfully
+          headers:
+            HX-Trigger:
+              description: HTMX event trigger for UI updates
+              schema:
+                type: string
+                example: "episode-added"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Episode'
+            text/html:
+              description: HTMX partial template (episode row)
+              schema:
+                type: string
+        '400':
+          description: Invalid request (validation errors)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: File too large (> 500MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported media type (not MP3)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error during upload/save
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    
+    get:
+      tags:
+        - episodes
+      summary: List all episodes
+      description: Returns a list of all episodes in the podcast feed
+      operationId: listEpisodes
+      responses:
+        '200':
+          description: Episodes list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Episode'
+            text/html:
+              description: HTMX partial template (episode list)
+              schema:
+                type: string
+
+  /api/episodes/{episodeId}:
+    delete:
+      tags:
+        - episodes
+      summary: Delete an episode
+      description: |
+        Removes an episode from the RSS feed and deletes the audio file from storage.
+        This operation is permanent and cannot be undone.
+      operationId: deleteEpisode
+      parameters:
+        - name: episodeId
+          in: path
+          required: true
+          description: Unique episode identifier
+          schema:
+            type: string
+          example: "ep-20251231-getting-started-with-go"
+      responses:
+        '200':
+          description: Episode deleted successfully
+          headers:
+            HX-Trigger:
+              description: HTMX event trigger for UI updates
+              schema:
+                type: string
+                example: "episode-deleted"
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Episode deleted successfully"
+        '404':
+          description: Episode not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error during deletion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/podcast/settings:
+    get:
+      tags:
+        - podcast
+      summary: Get podcast metadata
+      description: Returns current podcast-level settings (title, author, artwork, etc.)
+      operationId: getPodcastSettings
+      responses:
+        '200':
+          description: Podcast settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PodcastSettings'
+            text/html:
+              description: HTMX partial template (settings form)
+              schema:
+                type: string
+    
+    post:
+      tags:
+        - podcast
+      summary: Update podcast metadata
+      description: |
+        Updates podcast-level settings that appear in the RSS feed channel.
+        Changes are immediately reflected in the RSS feed.
+      operationId: updatePodcastSettings
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Podcast title
+                  example: "Tech Talks Daily"
+                author:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+                  description: Podcast author/creator
+                  example: "Jane Developer"
+                description:
+                  type: string
+                  minLength: 1
+                  maxLength: 4000
+                  description: Podcast description
+                  example: "Daily conversations about technology"
+                link:
+                  type: string
+                  format: uri
+                  description: Podcast homepage URL
+                  example: "https://techtalks.example.com"
+                language:
+                  type: string
+                  pattern: '^[a-z]{2}(-[a-z]{2})?$'
+                  description: Language code (e.g., "en-us", "es")
+                  example: "en-us"
+                category:
+                  type: string
+                  description: iTunes category
+                  example: "Technology"
+                explicit:
+                  type: string
+                  enum: [yes, no, clean]
+                  description: Explicit content flag
+                  example: "no"
+                artwork:
+                  type: string
+                  format: binary
+                  description: Podcast artwork image (square, 1400x1400 to 3000x3000 px)
+      responses:
+        '200':
+          description: Settings updated successfully
+          headers:
+            HX-Trigger:
+              description: HTMX event trigger for UI updates
+              schema:
+                type: string
+                example: "settings-updated"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PodcastSettings'
+        '400':
+          description: Invalid request (validation errors)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /feed.xml:
+    get:
+      tags:
+        - feed
+      summary: Serve RSS feed
+      description: |
+        Returns the podcast RSS 2.0 feed with iTunes extensions.
+        This is the URL that podcast clients and directories will access.
+        
+        **Caching**: Feed is served from memory for fast response times.
+        **Format**: RSS 2.0 + iTunes podcast namespace
+      operationId: getRSSFeed
+      responses:
+        '200':
+          description: RSS feed XML
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+                format: xml
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+                  <channel>
+                    <title>Tech Talks Daily</title>
+                    <link>https://techtalks.example.com</link>
+                    <description>Daily conversations about technology</description>
+                    <language>en-us</language>
+                    <pubDate>Wed, 31 Dec 2025 12:00:00 GMT</pubDate>
+                    <itunes:author>Jane Developer</itunes:author>
+                    <itunes:image href="https://techtalks.example.com/artwork.jpg" />
+                    <item>
+                      <title>Getting Started with Go</title>
+                      <description>An introduction to Go</description>
+                      <enclosure url="https://example.com/audio/ep-001.mp3" length="12345678" type="audio/mpeg" />
+                      <itunes:duration>32:15</itunes:duration>
+                    </item>
+                  </channel>
+                </rss>
+
+  /audio/{filename}:
+    get:
+      tags:
+        - media
+      summary: Serve audio file
+      description: |
+        Streams an audio file to the client.
+        Used by podcast clients when downloading episodes.
+      operationId: getAudioFile
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Audio filename
+          schema:
+            type: string
+          example: "ep-20251231-getting-started-with-go.mp3"
+      responses:
+        '200':
+          description: Audio file stream
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Audio file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /:
+    get:
+      tags:
+        - web
+      summary: Web dashboard
+      description: Serves the HTMX-powered web interface for managing episodes
+      operationId: getDashboard
+      responses:
+        '200':
+          description: HTML dashboard page
+          content:
+            text/html:
+              schema:
+                type: string
+
+components:
+  schemas:
+    Episode:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - pubDate
+        - audioURL
+        - audioLength
+        - audioType
+      properties:
+        id:
+          type: string
+          description: Unique episode identifier
+          example: "ep-20251231-getting-started-with-go"
+        title:
+          type: string
+          maxLength: 255
+          description: Episode title
+          example: "Getting Started with Go"
+        description:
+          type: string
+          maxLength: 4000
+          description: Episode description
+          example: "An introduction to the Go programming language"
+        pubDate:
+          type: string
+          format: date-time
+          description: Publication date (RFC-822 format in RSS)
+          example: "2025-12-31T10:00:00Z"
+        guid:
+          type: string
+          description: Globally unique identifier
+          example: "ep-20251231-getting-started-with-go"
+        audioURL:
+          type: string
+          format: uri
+          description: URL to audio file
+          example: "https://example.com/audio/ep-001.mp3"
+        audioLength:
+          type: integer
+          format: int64
+          description: Audio file size in bytes
+          example: 45678901
+        audioType:
+          type: string
+          description: MIME type
+          example: "audio/mpeg"
+        duration:
+          type: string
+          description: Episode duration (HH:MM:SS or seconds)
+          example: "32:15"
+        explicit:
+          type: string
+          enum: [yes, no, clean]
+          description: Explicit content flag
+          example: "no"
+        episodeNumber:
+          type: integer
+          description: Episode number
+          example: 1
+        seasonNumber:
+          type: integer
+          description: Season number
+          example: 1
+        episodeType:
+          type: string
+          enum: [full, trailer, bonus]
+          description: Episode type
+          example: "full"
+        filename:
+          type: string
+          description: Audio filename on disk
+          example: "ep-001.mp3"
+        uploadDate:
+          type: string
+          format: date-time
+          description: When episode was uploaded
+          example: "2025-12-31T09:45:00Z"
+    
+    PodcastSettings:
+      type: object
+      required:
+        - title
+        - link
+        - description
+        - language
+      properties:
+        title:
+          type: string
+          maxLength: 255
+          example: "Tech Talks Daily"
+        link:
+          type: string
+          format: uri
+          example: "https://techtalks.example.com"
+        description:
+          type: string
+          maxLength: 4000
+          example: "Daily conversations about technology"
+        language:
+          type: string
+          example: "en-us"
+        author:
+          type: string
+          maxLength: 255
+          example: "Jane Developer"
+        subtitle:
+          type: string
+          maxLength: 255
+          example: "Technology insights for developers"
+        summary:
+          type: string
+          maxLength: 4000
+          example: "Daily conversations about technology and innovation"
+        imageURL:
+          type: string
+          format: uri
+          example: "https://example.com/artwork.jpg"
+        explicit:
+          type: string
+          enum: [yes, no, clean]
+          example: "no"
+        category:
+          type: string
+          example: "Technology"
+    
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Invalid audio file format"
+        details:
+          type: string
+          description: Additional error details
+          example: "Only MP3 files are supported"

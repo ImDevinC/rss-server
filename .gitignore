@@ -1,0 +1,45 @@
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+
+# Go workspace files
+go.work
+go.work.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Application runtime data
+data/audio/*
+data/artwork/*
+data/podcast.xml
+
+# Keep directory structure
+!data/audio/.gitkeep
+!data/artwork/.gitkeep
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*
+
+# Temporary files
+*.tmp
+*.bak

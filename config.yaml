@@ -1,0 +1,24 @@
+# Podcast RSS Server Configuration
+
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+upload:
+  max_file_size_mb: 500
+  allowed_extensions:
+    - ".mp3"
+
+paths:
+  data_dir: "./data"
+  audio_dir: "./data/audio"
+  artwork_dir: "./data/artwork"
+  rss_file: "./data/podcast.xml"
+
+podcast:
+  default_title: "My Podcast"
+  default_author: "Podcast Creator"
+  default_description: "A podcast about interesting topics"
+  default_language: "en-us"
+  default_explicit: "no"
+  default_category: "Technology"

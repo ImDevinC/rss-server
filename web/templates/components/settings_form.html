@@ -1,0 +1,151 @@
+<section class="settings-section">
+    <h2>Podcast Settings</h2>
+    <p class="text-muted">Customize your podcast metadata for directories like Apple Podcasts and Spotify</p>
+    
+    <form hx-post="/api/podcast/settings" 
+          hx-encoding="multipart/form-data"
+          hx-indicator="#settings-spinner">
+        
+        <h3>Required Information</h3>
+        
+        <div class="form-group">
+            <label for="title">Podcast Title *</label>
+            <input type="text" 
+                   id="title" 
+                   name="title" 
+                   value="{{.Title}}" 
+                   placeholder="My Awesome Podcast" 
+                   maxlength="255"
+                   required>
+        </div>
+
+        <div class="form-group">
+            <label for="author">Author / Host Name *</label>
+            <input type="text" 
+                   id="author" 
+                   name="author" 
+                   value="{{.Author}}" 
+                   placeholder="Jane Doe" 
+                   maxlength="255"
+                   required>
+        </div>
+
+        <div class="form-group">
+            <label for="description">Description *</label>
+            <textarea id="description" 
+                      name="description" 
+                      placeholder="A podcast about interesting topics..." 
+                      maxlength="4000"
+                      required>{{.Description}}</textarea>
+            <small class="text-muted">Brief description of your podcast</small>
+        </div>
+
+        <div class="form-group">
+            <label for="link">Website URL *</label>
+            <input type="url" 
+                   id="link" 
+                   name="link" 
+                   value="{{.Link}}" 
+                   placeholder="https://example.com" 
+                   required>
+            <small class="text-muted">Your podcast's homepage</small>
+        </div>
+
+        <div class="form-group">
+            <label for="language">Language *</label>
+            <input type="text" 
+                   id="language" 
+                   name="language" 
+                   value="{{.Language}}" 
+                   placeholder="en-us" 
+                   pattern="[a-z]{2}(-[a-z]{2})?"
+                   required>
+            <small class="text-muted">Language code (e.g., en-us, es, fr)</small>
+        </div>
+
+        <h3 class="mt-20">iTunes Information</h3>
+
+        <div class="form-group">
+            <label for="subtitle">Subtitle (optional)</label>
+            <input type="text" 
+                   id="subtitle" 
+                   name="subtitle" 
+                   value="{{.Subtitle}}" 
+                   placeholder="Technology insights for developers" 
+                   maxlength="255">
+            <small class="text-muted">Short tagline for your podcast</small>
+        </div>
+
+        <div class="form-group">
+            <label for="summary">Summary (optional)</label>
+            <textarea id="summary" 
+                      name="summary" 
+                      placeholder="A longer description for iTunes..." 
+                      maxlength="4000">{{.Summary}}</textarea>
+            <small class="text-muted">Detailed description for podcast directories</small>
+        </div>
+
+        <div class="form-group">
+            <label for="category">Category *</label>
+            <select id="category" name="category" required>
+                <option value="">-- Select Category --</option>
+                <option value="Arts" {{if eq .Category "Arts"}}selected{{end}}>Arts</option>
+                <option value="Business" {{if eq .Category "Business"}}selected{{end}}>Business</option>
+                <option value="Comedy" {{if eq .Category "Comedy"}}selected{{end}}>Comedy</option>
+                <option value="Education" {{if eq .Category "Education"}}selected{{end}}>Education</option>
+                <option value="Fiction" {{if eq .Category "Fiction"}}selected{{end}}>Fiction</option>
+                <option value="Government" {{if eq .Category "Government"}}selected{{end}}>Government</option>
+                <option value="History" {{if eq .Category "History"}}selected{{end}}>History</option>
+                <option value="Health & Fitness" {{if eq .Category "Health & Fitness"}}selected{{end}}>Health & Fitness</option>
+                <option value="Kids & Family" {{if eq .Category "Kids & Family"}}selected{{end}}>Kids & Family</option>
+                <option value="Leisure" {{if eq .Category "Leisure"}}selected{{end}}>Leisure</option>
+                <option value="Music" {{if eq .Category "Music"}}selected{{end}}>Music</option>
+                <option value="News" {{if eq .Category "News"}}selected{{end}}>News</option>
+                <option value="Religion & Spirituality" {{if eq .Category "Religion & Spirituality"}}selected{{end}}>Religion & Spirituality</option>
+                <option value="Science" {{if eq .Category "Science"}}selected{{end}}>Science</option>
+                <option value="Society & Culture" {{if eq .Category "Society & Culture"}}selected{{end}}>Society & Culture</option>
+                <option value="Sports" {{if eq .Category "Sports"}}selected{{end}}>Sports</option>
+                <option value="Technology" {{if eq .Category "Technology"}}selected{{end}}>Technology</option>
+                <option value="True Crime" {{if eq .Category "True Crime"}}selected{{end}}>True Crime</option>
+                <option value="TV & Film" {{if eq .Category "TV & Film"}}selected{{end}}>TV & Film</option>
+            </select>
+            <small class="text-muted">Primary category for podcast directories</small>
+        </div>
+
+        <div class="form-group">
+            <label for="explicit">Explicit Content</label>
+            <select id="explicit" name="explicit">
+                <option value="no" {{if eq .Explicit "no"}}selected{{end}}>No</option>
+                <option value="yes" {{if eq .Explicit "yes"}}selected{{end}}>Yes</option>
+                <option value="clean" {{if eq .Explicit "clean"}}selected{{end}}>Clean</option>
+            </select>
+            <small class="text-muted">Does your podcast contain explicit language?</small>
+        </div>
+
+        <div class="form-group">
+            <label for="artwork">Podcast Artwork (optional)</label>
+            <input type="file" 
+                   id="artwork" 
+                   name="artwork" 
+                   accept=".jpg,.jpeg,.png">
+            <small class="text-muted">Square image, 1400x1400 to 3000x3000 pixels, max 5MB</small>
+            {{if .ImageURL}}
+            <div class="mt-20">
+                <p>Current artwork:</p>
+                <img src="{{.ImageURL}}" alt="Podcast Artwork" style="max-width: 200px; border-radius: 8px;">
+            </div>
+            {{end}}
+        </div>
+
+        <div class="form-group mt-20">
+            <button type="submit">Save Settings</button>
+            <a href="/">
+                <button type="button">Cancel</button>
+            </a>
+            
+            <span id="settings-spinner" class="htmx-indicator">
+                Saving...
+            </span>
+        </div>
+    </form>
+</section>
