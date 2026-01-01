@@ -13,10 +13,12 @@ import (
 type WebHandler struct {
 	store     *storage.RSSStore
 	templates *template.Template
+	baseURL   string // T046: Add baseURL field
 }
 
 // NewWebHandler creates a new web handler
-func NewWebHandler(store *storage.RSSStore, templatesDir string) (*WebHandler, error) {
+// T047: Updated to accept baseURL parameter
+func NewWebHandler(store *storage.RSSStore, templatesDir string, baseURL string) (*WebHandler, error) {
 	// Parse all templates including components
 	tmpl, err := template.ParseGlob(templatesDir + "/*.html")
 	if err != nil {
@@ -32,10 +34,12 @@ func NewWebHandler(store *storage.RSSStore, templatesDir string) (*WebHandler, e
 	return &WebHandler{
 		store:     store,
 		templates: tmpl,
+		baseURL:   baseURL,
 	}, nil
 }
 
 // HandleDashboard handles GET /
+// T048: Updated to use baseURL for FeedURL
 func (h *WebHandler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -48,7 +52,7 @@ func (h *WebHandler) HandleDashboard(w http.ResponseWriter, r *http.Request) {
 	// Prepare template data
 	data := map[string]interface{}{
 		"Podcast": podcast,
-		"FeedURL": fmt.Sprintf("http://%s/feed.xml", r.Host),
+		"FeedURL": fmt.Sprintf("%s/feed.xml", h.baseURL),
 	}
 
 	// Render template

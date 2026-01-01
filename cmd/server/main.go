@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/example/rss-server/internal/config"
 	"github.com/example/rss-server/internal/handlers"
 	"github.com/example/rss-server/internal/storage"
 )
@@ -41,20 +42,35 @@ func (lw *loggingResponseWriter) WriteHeader(code int) {
 }
 
 func main() {
-	// Configuration
-	audioDir := "./data/audio"
-	artworkDir := "./data/artwork"
-	rssFile := "./data/podcast.xml"
-	templatesDir := "./web/templates"
-	maxUploadMB := int64(500)
+	// T009: Load configuration at startup
+	cfg, err := config.Load("./config.yaml")
+	if err != nil {
+		log.Fatalf("Configuration error: %v", err)
+	}
 
-	// Load RSS store
-	store, err := storage.LoadRSSStore(rssFile)
+	// T010: Fail-fast validation
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Configuration validation failed: %v", err)
+	}
+
+	// T011: Log successful startup with base URL
+	log.Println("RSS Server starting...")
+	log.Printf("Base URL: %s", cfg.GetBaseURL())
+
+	// Use configuration values
+	audioDir := cfg.Paths.AudioDir
+	artworkDir := cfg.Paths.ArtworkDir
+	rssFile := cfg.Paths.RSSFile
+	templatesDir := "./web/templates"
+	maxUploadMB := int64(cfg.Upload.MaxFileSizeMB)
+	baseURL := cfg.GetBaseURL()
+
+	// Load RSS store with base URL
+	store, err := storage.LoadRSSStore(rssFile, baseURL)
 	if err != nil {
 		log.Fatalf("Failed to load RSS store: %v", err)
 	}
 
-	log.Println("RSS Server starting...")
 	log.Println("Loaded podcast feed successfully")
 
 	// Load templates
@@ -71,7 +87,8 @@ func main() {
 	episodesHandler := handlers.NewEpisodesHandler(store, audioDir, artworkDir, maxUploadMB, tmpl)
 	feedHandler := handlers.NewFeedHandler(store)
 	staticHandler := handlers.NewStaticHandler(audioDir)
-	webHandler, err := handlers.NewWebHandler(store, templatesDir)
+	// T049: Updated to pass baseURL to NewWebHandler
+	webHandler, err := handlers.NewWebHandler(store, templatesDir, baseURL)
 	if err != nil {
 		log.Fatalf("Failed to create web handler: %v", err)
 	}

@@ -169,12 +169,85 @@ curl -X DELETE http://localhost:8080/api/episodes/{episode-id}
 
 ## Configuration
 
+### config.yaml
+
+The server is configured using `config.yaml` in the repository root. 
+
+**Important**: The `base_url` field is **required** for podcast feeds to work correctly. Without a valid base URL, audio files and artwork will not be accessible to podcast clients.
+
+```yaml
+# Base URL for the server (REQUIRED)
+# This must be the public URL where your podcast is hosted
+# Examples: http://podcast.example.com, https://mypodcast.com
+base_url: "http://localhost:8080"
+
+server:
+  port: 8080
+  host: "0.0.0.0"
+
+upload:
+  max_file_size_mb: 500
+  allowed_extensions:
+    - ".mp3"
+
+paths:
+  data_dir: "./data"
+  audio_dir: "./data/audio"
+  artwork_dir: "./data/artwork"
+  rss_file: "./data/podcast.xml"
+
+podcast:
+  default_title: "My Podcast"
+  default_author: "Podcast Creator"
+  default_description: "A podcast about interesting topics"
+  default_language: "en-us"
+  default_explicit: "no"
+  default_category: "Technology"
+```
+
+### Configuration Fields
+
+#### base_url (REQUIRED)
+The public URL where your podcast server is hosted. This is used to generate absolute URLs in the RSS feed for audio files and artwork.
+
+- **Format**: Must include protocol (`http://` or `https://`) and hostname
+- **Examples**: 
+  - Development: `http://localhost:8080`
+  - Production: `https://podcast.example.com`
+  - With port: `http://example.com:3000`
+- **Validation**: Server will not start without a valid base_url
+
+#### server
+- `port`: HTTP server port (default: 8080)
+- `host`: Listen address (default: "0.0.0.0" for all interfaces)
+
+#### upload
+- `max_file_size_mb`: Maximum allowed audio file size in MB (default: 500)
+- `allowed_extensions`: List of allowed file extensions (default: [".mp3"])
+
+#### paths
+- `data_dir`: Base directory for data files
+- `audio_dir`: Directory for episode audio files
+- `artwork_dir`: Directory for podcast and episode artwork
+- `rss_file`: Path to the RSS feed XML file
+
+#### podcast
+Default metadata used when creating a new podcast:
+- `default_title`: Podcast title
+- `default_author`: Author/host name
+- `default_description`: Podcast description
+- `default_language`: Language code (e.g., "en-us")
+- `default_explicit`: Explicit content flag ("yes", "no", or "clean")
+- `default_category`: iTunes category
+
+### Environment Variables
+
 The server can be configured via environment variables:
 
-- `PORT`: HTTP server port (default: 8080)
+- `PORT`: HTTP server port (default: 8080) - **Note**: This overrides the `server.port` value in config.yaml
 
-Configuration files:
-- `config.yaml`: Server configuration (port, limits, directories)
+### Configuration Files
+- `config.yaml`: Server configuration (port, limits, directories, **base URL**)
 - `data/podcast.xml`: RSS feed source of truth
 
 ## Project Structure
@@ -204,6 +277,34 @@ Validate your RSS feed with:
 - **Cast Feed Validator**: https://podba.se/validate/
 
 ## Production Deployment
+
+### Pre-Deployment Checklist
+
+Before deploying to production, verify the following:
+
+- [ ] **Configure base_url**: Set `base_url` in `config.yaml` to your public domain
+  ```yaml
+  base_url: "https://podcast.yourdomain.com"
+  ```
+- [ ] **Test base_url**: Verify server starts without errors:
+  ```bash
+  go run cmd/server/main.go
+  ```
+- [ ] **Validate RSS feed**: Check that feed contains absolute URLs:
+  ```bash
+  curl https://podcast.yourdomain.com/feed.xml | grep enclosure
+  ```
+- [ ] **Test audio playback**: Verify audio files are accessible:
+  ```bash
+  curl -I https://podcast.yourdomain.com/audio/test-episode.mp3
+  ```
+- [ ] **SSL/TLS Certificate**: If using HTTPS, ensure valid SSL certificate is installed
+- [ ] **Firewall Rules**: Open port 8080 (or configured port) in firewall
+- [ ] **Reverse Proxy**: Configure Nginx/Apache if using reverse proxy
+- [ ] **File Permissions**: Ensure `data/` directory is writable by server process
+- [ ] **Backup Strategy**: Set up automated backups of `data/podcast.xml` and `data/audio/`
+- [ ] **Monitoring**: Configure health checks and uptime monitoring
+- [ ] **RSS Validation**: Test feed with [Cast Feed Validator](https://podba.se/validate/)
 
 ### Docker Production Deployment (Recommended)
 
@@ -334,20 +435,63 @@ server {
 
 ## Troubleshooting
 
+### Server Won't Start
+
+**Error: "Configuration error: base_url is required in configuration"**
+- Add the `base_url` field to your `config.yaml` file
+- Example: `base_url: "http://localhost:8080"`
+- The base_url must include the protocol (http:// or https://)
+
+**Error: "Configuration validation failed: base_url must use http or https scheme"**
+- Ensure your base_url starts with `http://` or `https://`
+- Invalid examples: `ftp://example.com`, `example.com`, `www.example.com`
+- Valid examples: `http://example.com`, `https://podcast.example.com:8080`
+
+**Error: "Configuration validation failed: base_url must include a host"**
+- The base_url must include a hostname or IP address
+- Invalid: `http://` or `https://`
+- Valid: `http://localhost:8080`, `https://example.com`
+
 ### Upload Fails
 - Check file is MP3 format
-- Verify file size is under 500MB
+- Verify file size is under 500MB (or configured `max_file_size_mb`)
 - Ensure sufficient disk space
+- Check file permissions on `data/audio/` directory
 
 ### Feed Not Updating
 - Check `data/podcast.xml` was modified
-- Verify file permissions
+- Verify file permissions on `data/` directory
 - Clear browser cache (Ctrl+F5)
+- Validate RSS feed with [W3C Feed Validator](https://validator.w3.org/feed/)
 
-### Audio Files Not Playing
-- Verify files exist in `data/audio/`
-- Check file permissions
-- Ensure correct base URL in configuration
+### Audio Files Not Playing in Podcast Clients
+- **Most Common Issue**: Incorrect or missing `base_url` in `config.yaml`
+- Verify files exist in `data/audio/` directory
+- Check file permissions (should be readable)
+- Ensure `base_url` matches your server's public URL
+- Test by accessing audio file directly: `{base_url}/audio/filename.mp3`
+- Validate RSS feed URLs are absolute (not relative): 
+  ```bash
+  curl http://localhost:8080/feed.xml | grep enclosure
+  ```
+  Should show: `http://your-domain.com/audio/file.mp3` (absolute)
+  NOT: `/audio/file.mp3` (relative)
+
+### RSS Feed Validation Errors
+
+**"Relative URLs in feed"**
+- Check that `base_url` is configured in `config.yaml`
+- Restart the server after changing `base_url`
+- Verify the feed URL by visiting `/feed.xml` in your browser
+
+**"Invalid URL encoding"**
+- The server automatically encodes special characters in URLs
+- If you have files with spaces or special characters, they will be encoded as `%20`, etc.
+
+### Dashboard Shows Wrong Feed URL
+- Verify `base_url` in `config.yaml` matches your deployment URL
+- Restart the server after changing configuration
+- For Docker deployments, ensure `base_url` reflects the external URL (not `localhost`)
 
 ## Development
 

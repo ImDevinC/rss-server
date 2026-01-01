@@ -15,12 +15,14 @@ type RSSStore struct {
 	mu       sync.RWMutex
 	podcast  *models.Podcast
 	filepath string
+	baseURL  string
 }
 
 // LoadRSSStore loads or creates a new RSS store from the given file path
-func LoadRSSStore(path string) (*RSSStore, error) {
+func LoadRSSStore(path string, baseURL string) (*RSSStore, error) {
 	store := &RSSStore{
 		filepath: path,
+		baseURL:  baseURL,
 	}
 
 	// Try to load existing feed
@@ -118,17 +120,19 @@ func (s *RSSStore) UpdatePodcast(p *models.Podcast) error {
 }
 
 // ServeXML writes the RSS feed XML to the provided writer
+// T037: Updated to pass baseURL to GenerateFeed()
 func (s *RSSStore) ServeXML() ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	return rss.GenerateFeed(s.podcast)
+	return rss.GenerateFeed(s.podcast, s.baseURL)
 }
 
 // saveToDisk writes the podcast to disk using atomic write (temp file + rename)
+// T038: Updated to pass baseURL to GenerateFeed()
 func (s *RSSStore) saveToDisk() error {
 	// Generate RSS XML
-	xmlData, err := rss.GenerateFeed(s.podcast)
+	xmlData, err := rss.GenerateFeed(s.podcast, s.baseURL)
 	if err != nil {
 		return fmt.Errorf("failed to generate RSS XML: %w", err)
 	}

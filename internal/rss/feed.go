@@ -2,15 +2,45 @@ package rss
 
 import (
 	"fmt"
+	"log"
+	"net/url"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/eduncan911/podcast"
 	"github.com/example/rss-server/internal/models"
 )
 
+// convertToAbsoluteURL converts a relative URL to an absolute URL using the base URL
+// T030: Helper function for URL conversion with RFC 3986 encoding
+func convertToAbsoluteURL(baseURL, relativePath string) (string, error) {
+	// If the path is already absolute, return it as-is
+	if strings.HasPrefix(relativePath, "http://") || strings.HasPrefix(relativePath, "https://") {
+		return relativePath, nil
+	}
+
+	// Parse base URL
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	// Parse relative path
+	rel, err := url.Parse(relativePath)
+	if err != nil {
+		return "", fmt.Errorf("invalid relative path: %w", err)
+	}
+
+	// Resolve the relative URL against the base URL
+	absolute := base.ResolveReference(rel)
+
+	return absolute.String(), nil
+}
+
 // GenerateFeed creates an RSS 2.0 + iTunes feed from the podcast model
-func GenerateFeed(p *models.Podcast) ([]byte, error) {
+// T031: Updated signature to accept baseURL parameter
+func GenerateFeed(p *models.Podcast, baseURL string) ([]byte, error) {
 	now := time.Now()
 	pubDate := p.PubDate
 	if pubDate.IsZero() {
@@ -37,8 +67,14 @@ func GenerateFeed(p *models.Podcast) ([]byte, error) {
 	if p.Summary != "" {
 		feed.ISummary = &podcast.ISummary{Text: p.Summary}
 	}
+	// T032: Apply URL conversion to podcast ImageURL
 	if p.ImageURL != "" {
-		feed.IImage = &podcast.IImage{HREF: p.ImageURL}
+		absoluteImageURL, err := convertToAbsoluteURL(baseURL, p.ImageURL)
+		if err != nil {
+			log.Printf("Warning: Failed to convert podcast image URL '%s': %v", p.ImageURL, err)
+		} else {
+			feed.IImage = &podcast.IImage{HREF: absoluteImageURL}
+		}
 	}
 	if p.Explicit != "" {
 		feed.IExplicit = p.Explicit
@@ -55,6 +91,7 @@ func GenerateFeed(p *models.Podcast) ([]byte, error) {
 	})
 
 	// Add episodes
+	// T034: Add error handling to skip malformed episodes
 	for _, ep := range episodes {
 		item := podcast.Item{
 			Title:       ep.Title,
@@ -69,9 +106,16 @@ func GenerateFeed(p *models.Podcast) ([]byte, error) {
 			item.GUID = ep.ID
 		}
 
+		// T033: Apply URL conversion to episode AudioURL with RFC 3986 encoding
 		// Add enclosure (audio file)
 		if ep.AudioURL != "" {
-			item.AddEnclosure(ep.AudioURL, podcast.MP3, ep.AudioLength)
+			absoluteAudioURL, err := convertToAbsoluteURL(baseURL, ep.AudioURL)
+			if err != nil {
+				// T034: Skip malformed episodes, log error
+				log.Printf("Warning: Skipping episode '%s' due to invalid audio URL '%s': %v", ep.ID, ep.AudioURL, err)
+				continue
+			}
+			item.AddEnclosure(absoluteAudioURL, podcast.MP3, ep.AudioLength)
 		}
 
 		// iTunes fields
@@ -83,7 +127,8 @@ func GenerateFeed(p *models.Podcast) ([]byte, error) {
 		}
 
 		if _, err := feed.AddItem(item); err != nil {
-			return nil, fmt.Errorf("failed to add episode %s: %w", ep.ID, err)
+			log.Printf("Warning: Failed to add episode '%s': %v", ep.ID, err)
+			continue
 		}
 	}
 

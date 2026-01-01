@@ -1,0 +1,311 @@
+openapi: 3.0.3
+info:
+  title: RSS Server - URL Fix API Contract
+  description: |
+    API contract changes for fixing relative URLs to absolute URLs in RSS feeds.
+    This contract documents the modified behavior of existing endpoints that now
+    return absolute URLs instead of relative paths.
+  version: 0.0.2
+  contact:
+    name: RSS Server Project
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: https://podcast.example.com
+    description: Production server (base URL must be configured)
+
+paths:
+  /feed.xml:
+    get:
+      summary: Get podcast RSS feed with absolute URLs
+      description: |
+        Returns the podcast RSS 2.0 feed with absolute URLs for all audio enclosures
+        and artwork. URLs are constructed using the configured base URL from config.yaml.
+        
+        **MODIFIED BEHAVIOR**: Previously returned relative URLs (e.g., "/audio/file.mp3").
+        Now returns absolute URLs (e.g., "https://podcast.example.com/audio/file.mp3").
+      operationId: getRSSFeed
+      tags:
+        - RSS Feed
+      responses:
+        '200':
+          description: Valid RSS 2.0 feed with absolute URLs
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum:
+                  - application/rss+xml
+              description: RSS feed MIME type
+          content:
+            application/rss+xml:
+              schema:
+                type: string
+                format: xml
+                example: |
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+                    <channel>
+                      <title>My Podcast</title>
+                      <link>https://podcast.example.com</link>
+                      <description>A podcast about interesting topics</description>
+                      <language>en-us</language>
+                      <itunes:image href="https://podcast.example.com/static/artwork/podcast.jpg"/>
+                      <item>
+                        <title>Episode 1</title>
+                        <description>First episode</description>
+                        <enclosure url="https://podcast.example.com/audio/episode1.mp3" length="5242880" type="audio/mpeg"/>
+                        <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+                      </item>
+                    </channel>
+                  </rss>
+              examples:
+                withAbsoluteURLs:
+                  summary: RSS feed with absolute URLs (new behavior)
+                  value: |
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <rss version="2.0">
+                      <channel>
+                        <itunes:image href="https://podcast.example.com/static/artwork/podcast.jpg"/>
+                        <item>
+                          <enclosure url="https://podcast.example.com/audio/episode.mp3" type="audio/mpeg"/>
+                        </item>
+                      </channel>
+                    </rss>
+                withEncodedCharacters:
+                  summary: RSS feed with URL-encoded special characters
+                  value: |
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <rss version="2.0">
+                      <channel>
+                        <item>
+                          <enclosure url="https://podcast.example.com/audio/My%20Episode%201.mp3" type="audio/mpeg"/>
+                        </item>
+                      </channel>
+                    </rss>
+        '500':
+          description: |
+            Internal server error (should not occur if base URL configured correctly).
+            If RSS generation fails completely, server logs error and may return
+            partial feed with valid episodes only.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Internal Server Error"
+
+  /:
+    get:
+      summary: Get web dashboard with absolute feed URL
+      description: |
+        Returns the HTML dashboard showing podcast information and RSS feed URL.
+        
+        **MODIFIED BEHAVIOR**: The displayed RSS feed URL now uses the configured
+        base URL instead of the current request hostname.
+      operationId: getDashboard
+      tags:
+        - Web Dashboard
+      responses:
+        '200':
+          description: HTML dashboard with absolute feed URL displayed
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum:
+                  - text/html; charset=utf-8
+          content:
+            text/html:
+              schema:
+                type: string
+                format: html
+              example: |
+                <!DOCTYPE html>
+                <html>
+                  <head><title>My Podcast</title></head>
+                  <body>
+                    <h1>My Podcast</h1>
+                    <p>RSS Feed URL: <a href="https://podcast.example.com/feed.xml">https://podcast.example.com/feed.xml</a></p>
+                  </body>
+                </html>
+
+  /audio/{filename}:
+    get:
+      summary: Download audio file (behavior unchanged)
+      description: |
+        Serves audio files from the configured audio directory.
+        **NO CHANGES** - This endpoint behavior is unchanged, but URLs pointing
+        to it in the RSS feed are now absolute.
+      operationId: getAudioFile
+      tags:
+        - Audio Files
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Audio filename (may contain URL-encoded characters)
+          schema:
+            type: string
+            example: "episode1.mp3"
+          examples:
+            simple:
+              value: "episode1.mp3"
+            withSpaces:
+              value: "My%20Episode.mp3"
+              description: Filename with URL-encoded spaces
+      responses:
+        '200':
+          description: Audio file content
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum:
+                  - audio/mpeg
+          content:
+            audio/mpeg:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Audio file not found
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "404 Not Found"
+
+  /static/artwork/{filename}:
+    get:
+      summary: Download artwork image (behavior unchanged)
+      description: |
+        Serves artwork images from the configured artwork directory.
+        **NO CHANGES** - This endpoint behavior is unchanged, but URLs pointing
+        to it in the RSS feed are now absolute.
+      operationId: getArtworkFile
+      tags:
+        - Static Assets
+      parameters:
+        - name: filename
+          in: path
+          required: true
+          description: Artwork filename
+          schema:
+            type: string
+            example: "podcast.jpg"
+      responses:
+        '200':
+          description: Artwork image content
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                enum:
+                  - image/jpeg
+                  - image/png
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Artwork file not found
+
+components:
+  schemas:
+    RSSFeed:
+      type: object
+      description: |
+        RSS 2.0 feed structure (XML format). All URL fields now contain absolute URLs.
+      properties:
+        channel:
+          type: object
+          properties:
+            title:
+              type: string
+              example: "My Podcast"
+            link:
+              type: string
+              format: uri
+              description: Absolute URL to podcast homepage (uses base URL)
+              example: "https://podcast.example.com"
+            itunes:image:
+              type: object
+              properties:
+                href:
+                  type: string
+                  format: uri
+                  description: Absolute URL to podcast artwork (MODIFIED - now absolute)
+                  example: "https://podcast.example.com/static/artwork/podcast.jpg"
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/RSSItem'
+
+    RSSItem:
+      type: object
+      description: RSS feed item (episode)
+      properties:
+        title:
+          type: string
+          example: "Episode 1"
+        enclosure:
+          type: object
+          properties:
+            url:
+              type: string
+              format: uri
+              description: Absolute URL to audio file (MODIFIED - now absolute with RFC 3986 encoding)
+              example: "https://podcast.example.com/audio/My%20Episode%201.mp3"
+            length:
+              type: integer
+              format: int64
+              description: Audio file size in bytes
+              example: 5242880
+            type:
+              type: string
+              enum:
+                - audio/mpeg
+              example: "audio/mpeg"
+
+    ConfigurationUpdate:
+      type: object
+      description: |
+        Configuration structure (config.yaml). This is not an HTTP API endpoint,
+        but documenting the configuration format for completeness.
+      required:
+        - baseURL
+      properties:
+        baseURL:
+          type: string
+          format: uri
+          description: |
+            **NEW REQUIRED FIELD**: Base URL for the podcast server. Must include
+            protocol (http/https) and hostname. Server will fail to start if missing
+            or invalid.
+          example: "https://podcast.example.com"
+          pattern: "^https?://[^/]+(/.*)?"
+        server:
+          type: object
+          properties:
+            port:
+              type: integer
+              example: 8080
+            host:
+              type: string
+              example: "0.0.0.0"
+
+tags:
+  - name: RSS Feed
+    description: Podcast RSS feed endpoints (modified to return absolute URLs)
+  - name: Web Dashboard
+    description: Web interface for podcast management (modified to display absolute feed URL)
+  - name: Audio Files
+    description: Audio file serving (unchanged, but referenced by absolute URLs in feed)
+  - name: Static Assets
+    description: Static file serving (unchanged, but referenced by absolute URLs in feed)
