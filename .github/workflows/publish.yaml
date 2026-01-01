@@ -1,0 +1,14 @@
+name: Publish Docker Image
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - v*
+
+jobs:
+  publish:
+    permissions:
+      packages: write
+      contents: read
+    uses: imdevinc/imdevinc/.github/workflows/shared-publish-docker.yaml@v1

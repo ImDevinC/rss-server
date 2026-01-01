@@ -1,0 +1,16 @@
+name: Bump SemVer Tags
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  bump-semver:
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
+    uses: imdevinc/imdevinc/.github/workflows/shared-bump-semver-tags.yaml@v1
+    secrets:
+      PUBLISH_PAT: ${{ secrets.PUBLISH_PAT }}
